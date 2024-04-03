@@ -92,9 +92,8 @@ def get_student(topic: str):
     docs_scores = vector_store.similarity_search_with_score(topic, 7)
     recommendations = []
     for doc_score in docs_scores:
-        doc, score = doc_score  # Assuming doc_score is a tuple like (doc, score)
-        # Now, let's assume doc is an object with a 'metadata' attribute which is a dictionary
-        name = doc.metadata["source"].split(".pdf")[0]  # Example adjustment
+        doc, score = doc_score 
+        name = doc.metadata["source"].split(".pdf")[0]
         response = chain2.invoke(
             f"Give me 3 keywords from {name}'s researches. Try relating to {topic} but if there isn't any just list what stands out"
         )
@@ -123,7 +122,7 @@ with gr.Blocks() as demo:
                 for student in students
             ]
             return data
-          
+
     with gr.Tab("Search"):
         gr.Markdown(
             "## Search researchers with the skills or experiences you are looking for"
@@ -135,7 +134,7 @@ with gr.Blocks() as demo:
         )
     with gr.Tab("Chat"):
         chat_interface = gr.ChatInterface(fn=chatbot_response, title="MSBA Chatbot", chatbot=gr.Chatbot(render=False, height=500))
-      
+
         search_button.click(search_skills, inputs=search_input, outputs=search_results)
 
 
