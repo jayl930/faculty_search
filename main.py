@@ -31,7 +31,7 @@ llm = AzureChatOpenAI(
     temperature=0.1,
 )
 
-vector_store = PineconeVectorStore(index_name='dpi', embedding=embeddings)
+vector_store = PineconeVectorStore(index_name='researchers', embedding=embeddings)
 retriever = vector_store.as_retriever()
 
 prompt = ChatPromptTemplate.from_messages(
