@@ -31,7 +31,7 @@ llm = AzureChatOpenAI(
     temperature=0.1,
 )
 
-vector_store = PineconeVectorStore(index_name='researchers', embedding=embeddings)
+vector_store = PineconeVectorStore(index_name="researchers", embedding=embeddings)
 retriever = vector_store.as_retriever()
 
 prompt = ChatPromptTemplate.from_messages(
@@ -92,7 +92,7 @@ def get_student(topic: str):
     docs_scores = vector_store.similarity_search_with_score(topic, 7)
     recommendations = []
     for doc_score in docs_scores:
-        doc, score = doc_score 
+        doc, score = doc_score
         name = doc.metadata["source"].split(".pdf")[0]
         response = chain2.invoke(
             f"Give me 3 keywords from {name}'s researches. Try relating to {topic} but if there isn't any just list what stands out"
@@ -114,14 +114,11 @@ def chatbot_response(messages, hisory):
 
 with gr.Blocks() as demo:
     gr.Markdown("# Ask about UIUC researchers")
-    
+
     def search_skills(query):
-            students = get_student(query)
-            data = [
-                [student["name"], student["summary"]]
-                for student in students
-            ]
-            return data
+        students = get_student(query)
+        data = [[student["name"], student["summary"]] for student in students]
+        return data
 
     with gr.Tab("Search"):
         gr.Markdown(
@@ -129,15 +126,15 @@ with gr.Blocks() as demo:
         )
         search_input = gr.Textbox(label="Enter skills or experiences")
         search_button = gr.Button("Search")
-        search_results = gr.Dataframe(
-            headers=["Name", "Summary"], interactive=False
-        )
+        search_results = gr.Dataframe(headers=["Name", "Summary"], interactive=False)
     with gr.Tab("Chat"):
-        chat_interface = gr.ChatInterface(fn=chatbot_response, title="MSBA Chatbot", chatbot=gr.Chatbot(render=False, height=500))
+        chat_interface = gr.ChatInterface(
+            fn=chatbot_response,
+            title="DPI Chatbot",
+            chatbot=gr.Chatbot(render=False, height=500),
+        )
 
         search_button.click(search_skills, inputs=search_input, outputs=search_results)
-
-
 
 
 app = gr.mount_gradio_app(app, demo, path="/")
