@@ -1,6 +1,3 @@
-import os
-import shutil
-import copy
 import pandas as pd
 import warnings
 
@@ -23,8 +20,8 @@ from pinecone import Pinecone
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
-os.environ["AZURE_OPENAI_API_KEY"] = "ec037c356dce4ae28e79a4fde7f583d1"
-os.environ["AZURE_OPENAI_ENDPOINT"] = "https://dpi2024.openai.azure.com/"
+# os.environ["AZURE_OPENAI_API_KEY"] =
+# os.environ["AZURE_OPENAI_ENDPOINT"] =
 
 embeddings = AzureOpenAIEmbeddings(
     azure_deployment="text-embedding-3-large",
