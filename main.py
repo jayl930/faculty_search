@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 import os
 import gradio as gr
+import pandas as pd
 
 from langchain_openai import AzureChatOpenAI
 from langchain_openai import AzureOpenAIEmbeddings
@@ -30,18 +31,20 @@ llm = AzureChatOpenAI(
     openai_api_version="2024-03-01-preview",
     temperature=0.1,
 )
-
-vector_store = PineconeVectorStore(index_name="researchers", embedding=embeddings)
-retriever = vector_store.as_retriever()
+df = pd.read_csv("search_people.csv", header=None)
+researcher_names = df[0].str.replace(".pdf", "").tolist()
+vector_store = PineconeVectorStore(index_name="dpi", embedding=embeddings)
+chain = None
 
 prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-            As an AI assistant, your primary role is to help me answer questions about UIUC faculties and their researches and experiences. 
-            Answer the question using ONLY the following context. If you don't know the answer, 
-            just say you don't know. DO NOT make up an answer.
+            As an AI assistant, your primary role is to help me answer questions about UIUC faculties and their researches and experiences.
+            The following context is research papers and their abstracts about a single faculty member at UIUC. Make sure to use all context provided. 
+            Answer the question using ONLY the following context. 
+            If you don't know the answer, just say you don't know. DO NOT make up an answer.
             
             Context: {context}
             """,
@@ -55,86 +58,59 @@ def format_docs(docs):
     return "\n\n".join(documents.page_content for documents in docs)
 
 
-chain = (
-    {
-        "context": retriever | RunnableLambda(format_docs),
-        "question": RunnablePassthrough(),
-    }
-    | prompt
-    | llm
-)
-summary = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """
-            As an AI assistant, you will give 3 keywords from researcher's pprofile. Do not write full sentences. Just need words.
-            Answer the question using ONLY the following context. If you don't know the answer, 
-            just say you don't know. DO NOT make up an answer.
-            
-            Context: {context}
-            """,
-        ),
-        ("human", "{question}"),
-    ]
-)
-chain2 = (
-    {
-        "context": retriever | RunnableLambda(format_docs),
-        "question": RunnablePassthrough(),
-    }
-    | summary
-    | llm
-)
+def setup_chain(selected_researcher):
+    global chain
+    if not selected_researcher:
+        return "Please select a researcher."
+    filter_param = {"source": f"{selected_researcher}.pdf"}
+    retriever = vector_store.as_retriever(
+        search_kwargs={"k": 10, "filter": filter_param}
+    )
+    chain = (
+        {
+            "context": retriever | RunnableLambda(format_docs),
+            "question": RunnablePassthrough(),
+        }
+        | prompt
+        | llm
+    )
+    return "Ready to talk about " + selected_researcher
 
 
-def get_student(topic: str):
-    docs_scores = vector_store.similarity_search_with_score(topic, 7)
-    recommendations = []
-    for doc_score in docs_scores:
-        doc, score = doc_score
-        name = doc.metadata["source"].split(".pdf")[0]
-        response = chain2.invoke(
-            f"Give me 3 keywords from {name}'s researches. Try relating to {topic} but if there isn't any just list what stands out"
-        )
-        summary = response.content
-        resume_link = f"{name}"
-        recommendations.append(
-            {"name": name, "summary": summary, "resume_link": resume_link}
-        )
-    return recommendations
+def on_button_click(selected_researcher):
+    setup_message = setup_chain(selected_researcher)
+    return setup_message
 
 
-def chatbot_response(messages, hisory):
-
+def chatbot_response(messages, history):
+    if chain is None:
+        return "No researcher selected. Please select a researcher first."
     response = chain.invoke(messages)
-
     return response.content
 
 
 with gr.Blocks() as demo:
     gr.Markdown("# Ask about UIUC researchers")
+    gr.Markdown("### Please select a researcher first and ask a question.")
+    with gr.Row():
+        with gr.Column(scale=1):
+            selected_researcher_dropdown = gr.Dropdown(
+                label="Select a Researcher", choices=researcher_names
+            )
+            submit_button = gr.Button("Submit")
+            setup_output = gr.Textbox(label="Current Researcher")
 
-    def search_skills(query):
-        students = get_student(query)
-        data = [[student["name"], student["summary"]] for student in students]
-        return data
+        with gr.Column(scale=2):
+            chat_interface = gr.ChatInterface(
+                fn=chatbot_response,
+                # title="DPI Chatbot",
+                chatbot=gr.Chatbot(render=False, height=500),
+            )
 
-    with gr.Tab("Search"):
-        gr.Markdown(
-            "## Search researchers with the skills or experiences you are looking for"
-        )
-        search_input = gr.Textbox(label="Enter skills or experiences")
-        search_button = gr.Button("Search")
-        search_results = gr.Dataframe(headers=["Name", "Summary"], interactive=False)
-    with gr.Tab("Chat"):
-        chat_interface = gr.ChatInterface(
-            fn=chatbot_response,
-            title="DPI Chatbot",
-            chatbot=gr.Chatbot(render=False, height=500),
-        )
-
-        search_button.click(search_skills, inputs=search_input, outputs=search_results)
-
+    submit_button.click(
+        fn=on_button_click,
+        inputs=[selected_researcher_dropdown],
+        outputs=[setup_output],
+    )
 
 app = gr.mount_gradio_app(app, demo, path="/")
